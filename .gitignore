@@ -1,0 +1,8 @@
+# Airflow runtime directories
+capstone-airflow/airflow-logs/
+capstone-airflow/airflow-plugins/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
