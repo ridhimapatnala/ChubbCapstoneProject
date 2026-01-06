@@ -37,52 +37,6 @@ This pipeline is built on **four datasets** that together form a **star-schema s
 * Target variable for analytics
 * Retention data represents **historical cohorts**, independent of current demographic simulation
 
-## Data Preprocessing & Feature Engineering
-
-
-
-### Key Processing Steps
-
-* Dataset-wise cleaning using Pandas
-
-  * Duplicate removal
-  * Data type correction
-  * Standardization of categorical values
-* Statistically driven missing value imputation
-* Standardization of:
-
-  * Academic year formats
-  * Institution codes
-  * Gender values
-  * Urban / rural indicators
-
-### Feature Engineering
-
-* Academic features:
-
-  * Total score
-  * Grade (A–F)
-  * Pass / fail status
-  * Academic performance score
-* Attendance features:
-
-  * Attendance rate
-  * Participation score aggregated at student-year level
-* Demographic features:
-
-  * Income bands
-  * Socio-economic risk flags
-  * Age-risk flags
-  * First-generation learner indicator
-* Retention features:
-    
-    Risk indicators derived such as:
-
-  * academic_risk_flag
-  * attendance_risk_flag 
-  * socio_economic_risk_flag
-  * age_risk_flag
-
 ## Architecture 
                  ┌──────────────────────────┐
                  │      Raw Source Data     │
@@ -118,8 +72,12 @@ This pipeline is built on **four datasets** that together form a **star-schema s
         │ • Student risk indicators                 │
         │ • Retention and dropout trends            │
         │ • Optimized for Power BI consumption      │
-        └───────────────────────────────────────────┘
-
+        └─────────────────────┬─────────────────────┘
+                              │
+                              ▼
+        ┌────────────────────────────────────────────┐
+        │               Power BI Dashboards          │
+        └────────────────────────────────────────────┘                       
 
 
 ## Technology Stack
