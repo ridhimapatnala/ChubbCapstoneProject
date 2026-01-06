@@ -1,51 +1,51 @@
 """
 Airflow DAG to trigger ETL process for student dropout analysis
+Custom logs are written to a separate file under airflow-logs
 """
 
 from airflow import DAG
 from airflow.providers.databricks.operators.databricks import DatabricksRunNowOperator
+from airflow.operators.python import PythonOperator
+from airflow.utils.trigger_rule import TriggerRule
 from datetime import datetime, timedelta
 import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-# Logging Configuration
+# Custom logger setup
+def get_custom_logger():
+    LOG_DIR = "/opt/airflow/logs/student_dropout_custom"
+    os.makedirs(LOG_DIR, exist_ok=True)
 
-LOG_DIR = "/opt/airflow/logs/student_dropout_etl"
-os.makedirs(LOG_DIR, exist_ok=True)
+    LOG_FILE = os.path.join(LOG_DIR, "student_dropout_etl.log")
 
-LOG_FILE = os.path.join(LOG_DIR, "student_dropout_etl.log")
+    logger = logging.getLogger("student_dropout_custom")
+    logger.setLevel(logging.INFO)
 
-logger = logging.getLogger("student_dropout_etl")
-logger.setLevel(logging.INFO)
+    if not logger.handlers:
+        handler = RotatingFileHandler(
+            LOG_FILE,
+            maxBytes=5 * 1024 * 1024,   #5mb limit per log file
+            backupCount=3
+        )
+        formatter = logging.Formatter(
+            "%(asctime)s | %(levelname)s | %(message)s" 
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
 
-# prevent duplicate logging handlers 
-if not logger.handlers:
-    file_handler = RotatingFileHandler(
-        LOG_FILE,
-        maxBytes=5 * 1024 * 1024,  # 5 MB
-        backupCount=3
-    )
+    return logger
 
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-    )
-
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
-# Monitoring 
-def on_task_success(context):
+def log_dag_start(**context):
+    logger = get_custom_logger()
     logger.info(
-        f"Task {context['task_instance'].task_id} completed successfully "
-        f"for DAG {context['dag'].dag_id}"
+        f"DAG started | dag_id={context['dag'].dag_id} | run_id={context['run_id']}"
     )
 
-def on_task_failure(context):
-    logger.error(
-        f"Task {context['task_instance'].task_id} failed "
-        f"for DAG {context['dag'].dag_id}",
-        exc_info=True
+def log_dag_end(**context):
+    logger = get_custom_logger()
+    logger.info(
+        f"DAG completed | dag_id={context['dag'].dag_id} | run_id={context['run_id']}"
     )
 
 default_args = {
@@ -53,9 +53,8 @@ default_args = {
     "depends_on_past": False,
     "retries": 2,
     "retry_delay": timedelta(minutes=5),
-    "on_success_callback": on_task_success,
-    "on_failure_callback": on_task_failure,
 }
+
 # DAG Definition
 with DAG(
     dag_id="student_dropout_databricks_etl",
@@ -67,14 +66,21 @@ with DAG(
     tags=["student_dropout", "databricks", "serverless"],
 ) as dag:
 
-    logger.info("Initializing Student Dropout Databricks ETL DAG")
-
+    start_etl = PythonOperator(
+        task_id="start_etl",
+        python_callable=log_dag_start
+    )
+    # main task to run databricks job
     run_student_dropout_job = DatabricksRunNowOperator(
         task_id="run_student_dropout_serverless_job",
         databricks_conn_id="databricks_default",
         job_id=736310244288717
     )
 
-    logger.info(
-        "DatabricksRunNowOperator configured with job_id=736310244288717"
+    end_etl = PythonOperator(
+        task_id="end_etl",
+        python_callable=log_dag_end,
+        trigger_rule=TriggerRule.ALL_DONE
     )
+
+    start_etl >> run_student_dropout_job >> end_etl
